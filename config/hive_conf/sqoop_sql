@@ -1,0 +1,1 @@
+sqoop export --input-fields-terminated-by '\\001' --export-dir /home/hduser/hive_tmp/warehouse/hive_dianping_sort/dt\=yyyyMM --connect jdbc.url --username jdbc.username--password jdbc.password --table hive_dianping_final${'date'}1

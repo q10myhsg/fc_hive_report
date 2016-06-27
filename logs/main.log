@@ -1,0 +1,12 @@
+2016-05-11 17:52:50 DEBUG com.fangcheng.filter.AfterAction  - =======AfterAction=========
+2016-05-11 17:52:50 DEBUG com.fangcheng.filter.AfterAction2  - =====AfterAction2========
+2016-05-11 17:53:07 DEBUG com.fangcheng.filter.AfterAction2  - =====AfterAction2========
+2016-05-11 17:53:07 DEBUG com.fangcheng.filter.AfterAction  - =======AfterAction=========
+2016-05-11 17:55:18 DEBUG com.fangcheng.action.AfterAction2  - =====AfterAction2========
+2016-05-11 17:55:18 DEBUG com.fangcheng.action.AfterAction  - =======AfterAction=========
+2016-05-11 17:55:38 DEBUG com.fangcheng.action.AfterAction  - =======AfterAction=========
+2016-05-11 17:55:38 DEBUG com.fangcheng.action.AfterAction2  - =====AfterAction2========
+2016-05-11 17:57:55 DEBUG com.fangcheng.action.AfterAction  - =======AfterAction=========
+2016-05-11 17:57:55 DEBUG com.fangcheng.action.AfterAction2  - =====AfterAction2========
+2016-05-11 17:58:07 DEBUG com.fangcheng.action.AfterAction2  - =====AfterAction2========
+2016-05-11 17:58:07 DEBUG com.fangcheng.action.AfterAction  - =======AfterAction=========

@@ -1,0 +1,613 @@
+#点评基础数据去噪
+Begin_dianping_filter
+from hive_shoptype a join hive_dianping t
+  on (a.shop_type = t.shoptype)
+  insert overwrite table hive_dianping_filter
+    partition (dt = #time_type1#)
+    select
+      /*+ MAPJOIN(a) */
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      a.type_name,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice*100,
+      t.monthlyHits,
+      t.popularity,
+      t.wishTotal,
+      t.score,
+      t.score1,
+      t.score2,
+      t.score3,
+      t.score4,
+      t.shopPower,
+      t.promoId,
+      t.picTotal,
+      t.branchTotal,
+      t.voteTotal,
+      t.webSite,
+      t.timestamp
+    where t.dt=#time_type1#
+      and t.shopId>0
+      and t.shopid is not null
+      and t.cityid in (#city#)
+      and t.shopName != ''
+      and t.shoptype in (#shoptype#)
+End_dianping_filter
+#page基础数据去噪
+Begin_page_filter
+from hive_page t 
+  insert overwrite table hive_page_filter
+    partition (dt = #time_type1#)
+    select
+      t.shopId,
+      t.cityId,
+      t.star0,
+      t.star1,
+      t.star2,
+      t.star3,
+      t.star4,
+      t.businessarea,
+      t.cat_1,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      t.piccount,
+      t.timestamp
+    where t.dt=#time_type1#
+      and t.shopId>0
+End_page_filter
+#dianping和page关联表
+Begin_dianping_page
+insert overwrite table hive_dianping_page
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      t.cat_1,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice,
+      t.monthlyHits,
+      t.popularity,
+      t.wishTotal,
+      t.score,
+      t.score1,
+      t.score2,
+      t.score3,
+      t.score4,
+      t.shopPower,
+      t.promoId,
+      t.picTotal,
+      t.branchTotal,
+      t.voteTotal,
+      t.webSite,
+      u.star0,
+      u.star1,
+      u.star2,
+      u.star3,
+      u.star4,
+      u.businessarea,
+      u.cat_2,
+      u.cat_3,
+      u.district,
+      u.comments,
+      u.piccount,
+      t.timestamp
+      from hive_dianping_filter t join hive_page_filter u
+        on (t.shopid=u.shopid and u.dt=#time_type1#)
+     where t.dt=#time_type1#
+End_dianping_page
+#根据二级业态转换一级业态
+Begin_dianping_page_temp
+insert overwrite table hive_dianping_page_temp
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      if(u.cat1 is null,t.cat_1,u.cat1),
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice,
+      t.monthlyHits,
+      t.popularity,
+      t.wishTotal,
+      t.score,
+      t.score1,
+      t.score2,
+      t.score3,
+      t.score4,
+      t.shopPower,
+      t.promoId,
+      t.picTotal,
+      t.branchTotal,
+      t.voteTotal,
+      t.webSite,
+      t.star0,
+      t.star1,
+      t.star2,
+      t.star3,
+      t.star4,
+      t.businessarea,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      t.piccount,
+      t.timestamp
+      from hive_dianping_page t left outer join hive_brand_cat u
+        on (t.cat_2=u.cat2 and t.cityId=u.dp_city)
+     where t.dt=#time_type1#
+End_dianping_page_temp
+#累计点评中店铺添加时间
+Begin_dianping_adddate_temp
+insert overwrite table hive_dianping_adddate_temp
+  select 
+      t.shopid,
+      t.shoptype,
+      t.cityid,
+      t.adddate,
+      t.timestamp
+ from hive_dianping t
+  and t.shopid is not null
+where t.dt=#time_type1#
+End_dianping_adddate_temp
+
+Begin_dianping_adddate_temp2
+insert overwrite table hive_dianping_adddate_temp2
+  partition (dt=#time_type1#)
+    select 
+      if(t.shopid is null,u.shopid,t.shopid),
+      if(t.shoptype is null,u.shoptype,t.shoptype),
+      if(t.cityid is null,u.cityid,t.cityid),
+      if(t.adddate is null,u.adddate,t.adddate),
+      if(t.timestamp is null,u.timestamp,t.timestamp)
+ from hive_dianping_adddate t full join hive_dianping_adddate_temp u
+   on (t.shopid=u.shopid)
+End_dianping_adddate_temp2
+
+Begin_dianping_adddate
+insert overwrite table hive_dianping_adddate
+  select 
+      t.shopid,
+      t.shoptype,
+      t.cityid,
+      t.adddate,
+      t.timestamp
+ from hive_dianping_adddate_temp2 t
+where t.dt=#time_type1#
+End_dianping_adddate
+
+#替换dianping中的adddate
+Begin_dianping_transdate
+insert overwrite table hive_dianping_transdate
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      t.cat_1,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      if(u.addDate is null,t.addDate,u.addDate) addDate,
+      t.avgPrice,
+      t.monthlyHits,
+      t.popularity,
+      t.wishTotal,
+      t.score,
+      t.score1,
+      t.score2,
+      t.score3,
+      t.score4,
+      t.shopPower,
+      t.promoId,
+      t.picTotal,
+      t.branchTotal,
+      t.voteTotal,
+      t.webSite,
+      t.star0,
+      t.star1,
+      t.star2,
+      t.star3,
+      t.star4,
+      t.businessarea,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      t.piccount,
+      t.timestamp
+      from hive_dianping_page_temp t left outer join hive_dianping_adddate u
+        on (t.shopId=u.shopId)
+     where t.dt=#time_type1#
+End_dianping_transdate
+#统计点评变化信息
+Begin_dianping_change
+insert overwrite table hive_dianping_change
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      t.cat_1,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice,
+      t.monthlyHits,
+      (t.monthlyHits-if(u.monthlyHits is null,0,u.monthlyHits)) monthlyHits_change,
+      t.popularity,
+      t.wishTotal,
+      (t.wishTotal-if(u.wishTotal is null,0,u.wishTotal)) wishTotal_change,
+      t.score,
+      (t.score-if(u.score is null,0,u.score)) score_change,
+      t.score1,
+      t.score2,
+      t.score3,
+      t.score4,
+      t.shopPower,
+      t.promoId,
+      t.picTotal,
+      t.branchTotal,
+      t.voteTotal,
+      t.webSite,
+      t.star0,
+      t.star1,
+      t.star2,
+      t.star3,
+      t.star4,
+      t.businessarea,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      (t.comments-if(u.comments is null,0,u.comments)) comments_change,
+      t.piccount,
+      (t.piccount-if(u.piccount is null,0,u.piccount)) piccount_change,
+      t.timestamp
+      from hive_dianping_transdate t left outer join hive_dianping_transdate u
+        on (t.shopid=u.shopid and u.dt=#time_type2#)
+     where t.dt=#time_type1#
+End_dianping_change
+#按地市统计品牌信息
+Begin_city_brand1
+from hive_dianping_change t 
+  insert overwrite table hive_city_brand1
+    partition (dt = #time_type1#)
+    select 
+      t.shopName,
+      t.cat_1,
+      t.cityId,
+      count(1) shopNum,
+      sum(expend_shop(t.addDate,3)) newshopnum,
+      sum(t.avgPrice)/count(1) brandavgPrice,
+      sum(t.monthlyHits)/count(1),
+      sum(t.wishTotal)/count(1),
+      sum(t.score)/count(1),
+      sum(t.shopPower)/count(1),
+      sum(t.popularity)/count(1),
+      sum(t.comments)/count(1),
+      sum(t.piccount)/count(1),
+      #time_type1#
+    where t.dt=#time_type1#
+ group by t.shopName,t.cat_1,t.cityId
+End_city_brand1
+#统计品牌出现的地市个数
+Begin_city_brand2
+from hive_city_brand1 t 
+  insert overwrite table hive_city_brand2
+    partition (dt = #time_type1#)
+    select 
+      t.brandName,
+      t.cat_1,
+      sum(t.shopNum),
+      count(1) cityNum,
+      t.timestamp
+    where t.dt=#time_type1#
+ group by t.brandName,t.cat_1,t.timestamp
+End_city_brand2
+
+ #提取mall中店铺列表
+Begin_brand_inmallid
+insert overwrite table hive_brand_inmallid
+  partition (dt = #time_type1#)
+  select
+    shopId,
+    shop,
+    #time_type1#
+  from hive_page lateral view shops_udtf(shops) col1 AS shop
+ where dt=#time_type1#
+End_brand_inmallid
+#匹配mall中店铺名字
+Begin_brand_inmallname
+insert overwrite table hive_brand_inmallname
+  partition (dt = #time_type1#)
+  select
+    distinct(shopName),
+    #time_type1#
+    from (select shopName from hive_brand_inmallid b join hive_dianping d on (b.shop_id=d.shopId and d.dt=#time_type1#) where b.dt=#time_type1#) as temp
+End_brand_inmallname
+
+
+#标注店铺是否是连锁品牌、开设新店数量
+Begin_brand_tag1
+insert overwrite table hive_dianping_brand1
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      t.cat_1,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice,
+      u.avgPrice,
+      t.monthlyHits,
+      t.monthlyHits_change,
+      t.wishTotal,
+      t.wishTotal_change,
+      t.score,
+      t.score_change,
+      t.promoId,
+      t.piccount,
+      t.piccount_change,
+      t.businessarea,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      t.comments_change,
+      0,
+      u.newShopNum,
+      t.timestamp
+      from hive_dianping_change t left outer join hive_city_brand1 u
+        on (t.shopName=u.brandName and t.cat_1=u.cat_1 and t.cityId=u.cityId and u.dt=#time_type1#)
+     where t.dt=#time_type1#
+End_brand_tag1
+#标注店铺所在的品牌开设城市的数量
+Begin_brand_tag2
+insert overwrite table hive_dianping_brand2
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.shopName,
+      t.shopType,
+      t.cat_1,
+      t.address,
+      t.cityId,
+      t.phoneNo,
+      t.phoneNo2,
+      t.addDate,
+      t.avgPrice,
+      t.brandAvgPrice,
+      t.monthlyHits,
+      t.monthlyHits_change,
+      t.wishTotal,
+      t.wishTotal_change,
+      t.score,
+      t.score_change,
+      t.promoId,
+      t.piccount,
+      t.piccount_change,
+      t.businessarea,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.comments,
+      t.comments_change,
+      u.shopNum,
+      t.newShopNum,
+      u.cityNum,
+      t.timestamp
+      from hive_dianping_brand1 t left outer join hive_city_brand2 u
+        on (t.shopName=u.brandName and t.cat_1=u.cat_1 and u.dt=#time_type1#)
+     where t.dt=#time_type1#
+End_brand_tag2
+#生成最终数据表
+Begin_dianping_final_temp
+from hive_city a join hive_dianping_brand2 t
+  on (a.dianping_id = t.cityId and t.dt=#time_type1#)
+  insert overwrite table hive_dianping_final_temp
+    partition (dt = #time_type1#)
+    select
+      /*+ MAPJOIN(a) */
+      t.shopId,
+      from_unixtime(cast(substr(t.addDate,0,10) as bigint),'yyyy-MM-dd') adddate,
+      t.shopType,
+      t.cat_1,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      a.area_id,
+      t.shopName,
+      t.businessarea,
+      t.monthlyHits_change,
+      t.comments_change,
+      t.wishTotal_change,
+      t.piccount_change,
+      t.score,
+      t.score_change,
+      t.shopNum,
+      t.monthlyHits,
+      t.comments,
+      t.wishTotal,
+      t.piccount,
+      new_shop(t.addDate,3) newShop,
+      t.newShopNum,
+      t.cityNum,
+      t.promoId,
+      mature_shop(t.addDate,1,3) matureShop,
+      t.avgPrice,
+      round(t.brandAvgPrice),
+      t.address,
+      t.phoneNo,
+      t.phoneNo2,
+      t.timestamp
+End_dianping_final_temp
+Begin_dianping_final
+insert overwrite table hive_dianping_final
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.adddate,
+      t.shopType,
+      t.cat_1,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.cityId,
+      t.shopName,
+      t.businessarea,
+      t.monthlyHits_change,
+      t.comments_change,
+      t.wishTotal_change,
+      t.piccount_change,
+      t.score,
+      t.score_change,
+      t.shopNum,
+      t.monthlyHits,
+      t.comments,
+      t.wishTotal,
+      t.piccount,
+      t.newShop,
+      t.newShopNum,
+      t.cityNum,
+      t.promoId,
+      t.matureShop,
+      t.avgPrice,
+      t.brandAvgPrice,
+      t.address,
+      t.phoneNo,
+      t.phoneNo2,
+      if(u.brand_name is null,0,1),
+      t.timestamp
+ from hive_dianping_final_temp t left outer join hive_brand_inmallname u
+      on (t.shopName=u.brand_name and u.dt=#time_type1#)
+where t.dt=#time_type1#
+End_dianping_final
+
+#计算店铺排序分数
+Begin_dianping_sort_temp
+insert overwrite table hive_dianping_sort_temp
+    select 
+      t.shopId,
+      t.adddate,
+      t.shopType,
+      t.cat_1,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.cityId,
+      t.shopName,
+      t.businessarea,
+      t.monthlyHits_change,
+      t.comments_change,
+      t.wishTotal_change,
+      t.piccount_change,
+      t.score,
+      t.score_change,
+      t.shopNum,
+      t.monthlyHits,
+      t.comments,
+      t.wishTotal,
+      t.piccount,
+      log10(t.monthlyHits-t.monthlyHits_change+1) monthlyHits_llog,
+      log10(t.comments-t.comments_change+1) comments_llog,
+      log10(t.wishTotal-t.wishTotal_change+1) wishTotal_llog,
+      log10(t.piccount-t.piccount_change+1) piccount_llog,
+      log10(t.monthlyHits+1) monthlyHits_nlog,
+      log10(t.comments+1) comments_nlog,
+      log10(t.wishTotal+1) wishTotal_nlog,
+      log10(t.piccount+1) piccount_nlog,
+      t.newShop,
+      t.newShopNum,
+      t.cityNum,
+      t.promoId,
+      t.matureShop,
+      t.avgPrice,
+      t.brandAvgPrice,
+      t.address,
+      t.phoneNo,
+      t.phoneNo2,
+      t.isinmall,
+      t.timestamp
+ from hive_dianping_final t
+where t.dt=#time_type1#
+End_dianping_sort_temp
+
+Begin_dianping_sort_max
+insert overwrite table hive_dianping_sort_max
+  select 
+      max(t.monthlyHits_nlog),
+      max(t.comments_nlog),
+      max(t.wishTotal_nlog),
+      max(t.piccount_nlog)
+ from hive_dianping_sort_temp t
+End_dianping_sort_max
+
+Begin_dianping_sort
+insert overwrite table hive_dianping_sort
+  partition (dt=#time_type1#)
+    select 
+      t.shopId,
+      t.adddate,
+      t.shopType,
+      t.cat_1,
+      t.cat_2,
+      t.cat_3,
+      t.district,
+      t.cityId,
+      t.shopName,
+      t.businessarea,
+      t.monthlyHits_change,
+      t.comments_change,
+      t.wishTotal_change,
+      t.piccount_change,
+      t.score,
+      t.score_change,
+      t.shopNum,
+      t.monthlyHits,
+      t.comments,
+      t.wishTotal,
+      t.piccount,
+      round(
+      1/(datediff(t.timestamp,t.adddate)+5) +
+      (t.monthlyHits_nlog-t.monthlyHits_llog)/(t.monthlyHits_llog+u.monthlyHits_max)+log(500,(t.monthlyHits_change+abs(t.monthlyHits_change)+1))+
+      (t.comments_nlog-t.comments_llog)/(t.comments_llog+u.comments_max)+
+      (t.wishTotal_nlog-t.wishTotal_llog)/(t.wishTotal_llog+u.wishTotal_max)+
+      (t.piccount_nlog-t.piccount_llog)/(t.piccount_llog+u.piccount_max),3)*1000 sort,
+      t.newShop,
+      t.newShopNum,
+      t.cityNum,
+      t.promoId,
+      t.matureShop,
+      t.avgPrice,
+      t.brandAvgPrice,
+      t.address,
+      t.phoneNo,
+      t.phoneNo2,
+      t.isinmall,
+      t.timestamp
+ from hive_dianping_sort_temp t left outer join hive_dianping_sort_max u
+      on (1=1)
+End_dianping_sort

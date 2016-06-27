@@ -1,0 +1,8 @@
+SET hive.exec.compress.output=true;
+SET mapred.output.compress=true;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+add jar /home/hduser/project/function/function.jar;
+create temporary function expend_shop as 'com.fangcheng.function.expend_shop';
+create temporary function new_shop as 'com.fangcheng.function.new_shop';
+create temporary function mature_shop as 'com.fangcheng.function.mature_shop';
+create temporary function shops_udtf as 'com.fangcheng.function.shops_udtf';

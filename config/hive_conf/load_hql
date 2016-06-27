@@ -1,0 +1,6 @@
+SET hive.exec.compress.output=true;
+SET mapred.output.compress=true;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+SET mapred.reduce.tasks=5;
+alter table ${hiveconf:hive_table} add if not exists partition( ${hiveconf:partition}); 
+load data local inpath "${hiveconf:files}" overwrite into table ${hiveconf:hive_table} partition(${hiveconf:partition});
